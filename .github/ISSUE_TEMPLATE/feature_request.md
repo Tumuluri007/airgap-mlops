@@ -3,6 +3,8 @@ name: Feature Request
 about: Propose a new feature for AGM
 title: "[feat] "
 labels: enhancement
+assignees: ''
+
 ---
 
 ## What Problem Does This Solve

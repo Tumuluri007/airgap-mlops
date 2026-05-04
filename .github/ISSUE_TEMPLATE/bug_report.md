@@ -3,6 +3,8 @@ name: Bug Report
 about: Report a bug in AGM
 title: "[bug] "
 labels: bug
+assignees: ''
+
 ---
 
 ## Description
