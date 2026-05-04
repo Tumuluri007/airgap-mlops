@@ -1,0 +1,142 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cmba-system
+  labels:
+    airgap.mlops/enforced: "true"
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cmba-webhook
+  namespace: cmba-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cmba-webhook
+rules:
+  - apiGroups: ["cmba.airgap.mlops"]
+    resources: ["modelbindings"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cmba-webhook
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cmba-webhook
+subjects:
+  - kind: ServiceAccount
+    name: cmba-webhook
+    namespace: cmba-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cmba-webhook
+  namespace: cmba-system
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cmba-webhook
+  template:
+    metadata:
+      labels:
+        app: cmba-webhook
+    spec:
+      serviceAccountName: cmba-webhook
+      containers:
+        - name: webhook
+          image: registry.airgap.local/cmba/webhook:0.1.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - --listen=:8443
+            - --tls-cert=/etc/cmba/tls/tls.crt
+            - --tls-key=/etc/cmba/tls/tls.key
+            - --trust-root=/etc/cmba/trust-root
+          ports:
+            - containerPort: 8443
+              name: webhook
+          volumeMounts:
+            - name: tls
+              mountPath: /etc/cmba/tls
+              readOnly: true
+            - name: trust-root
+              mountPath: /etc/cmba/trust-root
+              readOnly: true
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8443
+              scheme: HTTPS
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8443
+              scheme: HTTPS
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: tls
+          secret:
+            secretName: cmba-webhook-tls
+        - name: trust-root
+          configMap:
+            name: airgap-trust-root
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cmba-webhook
+  namespace: cmba-system
+spec:
+  selector:
+    app: cmba-webhook
+  ports:
+    - port: 443
+      targetPort: 8443
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: cmba-webhook
+webhooks:
+  - name: cmba.airgap.mlops
+    sideEffects: None
+    admissionReviewVersions: ["v1"]
+    failurePolicy: Fail
+    timeoutSeconds: 30
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: In
+          values: ["ml-serving"]
+    rules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        resources: ["pods"]
+        operations: ["CREATE"]
+    clientConfig:
+      service:
+        name: cmba-webhook
+        namespace: cmba-system
+        path: /validate
+        port: 443
+      # CA bundle injected at install time by cert-manager (helm template
+      # uses a cert-manager.io/inject-ca-from annotation).

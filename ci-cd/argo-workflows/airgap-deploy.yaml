@@ -1,0 +1,108 @@
+# Argo Workflow that runs INSIDE the air-gapped cluster.
+# Watches a "drop folder" PVC where the signed transfer bundle is placed
+# after physical transfer. Verifies the bundle, loads the container into
+# the local registry, applies the ModelBinding CRD, applies the
+# InferenceService, and records the import event in the Evidence Ledger.
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: airgap-deploy-
+  namespace: airgap-system
+spec:
+  entrypoint: deploy
+  arguments:
+    parameters:
+      - name: bundle-path
+        value: /drop/airgap-bundle.tar
+      - name: target-namespace
+        value: ml-serving
+
+  volumes:
+    - name: drop-folder
+      persistentVolumeClaim:
+        claimName: airgap-drop-pvc
+    - name: trust-root
+      configMap:
+        name: airgap-trust-root
+
+  templates:
+    - name: deploy
+      steps:
+        - - name: verify-bundle
+            template: verify-bundle
+        - - name: import-container
+            template: import-container
+        - - name: apply-modelbinding
+            template: apply-modelbinding
+        - - name: apply-inferenceservice
+            template: apply-inferenceservice
+        - - name: record-event
+            template: record-event
+
+    - name: verify-bundle
+      container:
+        image: registry.airgap.local/transfer-bundler/verify:0.1.0
+        command: ["/usr/local/bin/verify-bundle.sh"]
+        args:
+          - "{{workflow.parameters.bundle-path}}"
+          - "/etc/airgap/sigstore"
+        volumeMounts:
+          - name: drop-folder
+            mountPath: /drop
+            readOnly: true
+          - name: trust-root
+            mountPath: /etc/airgap/sigstore
+            readOnly: true
+
+    - name: import-container
+      container:
+        image: registry.airgap.local/skopeo:1.15
+        command: ["sh", "-c"]
+        args:
+          - |
+            tar -xf {{workflow.parameters.bundle-path}} -C /tmp ml-model.tar
+            skopeo copy --tls-verify=true \
+              docker-archive:/tmp/ml-model.tar \
+              docker://registry.airgap.local/inference/ml-model:latest
+        volumeMounts:
+          - name: drop-folder
+            mountPath: /drop
+            readOnly: true
+
+    - name: apply-modelbinding
+      container:
+        image: registry.airgap.local/kubectl:1.30
+        command: ["sh", "-c"]
+        args:
+          - |
+            tar -xf {{workflow.parameters.bundle-path}} -C /tmp modelbinding.yaml
+            kubectl apply -n {{workflow.parameters.target-namespace}} -f /tmp/modelbinding.yaml
+        volumeMounts:
+          - name: drop-folder
+            mountPath: /drop
+            readOnly: true
+
+    - name: apply-inferenceservice
+      container:
+        image: registry.airgap.local/kubectl:1.30
+        command: ["sh", "-c"]
+        args:
+          - |
+            tar -xf {{workflow.parameters.bundle-path}} -C /tmp inferenceservice.yaml
+            kubectl apply -n {{workflow.parameters.target-namespace}} -f /tmp/inferenceservice.yaml
+        volumeMounts:
+          - name: drop-folder
+            mountPath: /drop
+            readOnly: true
+
+    - name: record-event
+      container:
+        image: registry.airgap.local/kubectl:1.30
+        command: ["sh", "-c"]
+        args:
+          - |
+            kubectl create event \
+              --namespace={{workflow.parameters.target-namespace}} \
+              --type=Normal \
+              --reason=AGMBundleImported \
+              --message="Bundle {{workflow.parameters.bundle-path}} imported successfully"

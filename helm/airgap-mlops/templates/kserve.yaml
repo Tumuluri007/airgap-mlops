@@ -1,0 +1,30 @@
+{{- if .Values.kserve.enabled }}
+# KServe controller is installed via its upstream chart in production.
+# This template configures KServe for offline mode by setting the
+# inferenceservice config to disable any external pulls.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: inferenceservice-config
+  namespace: kserve
+  labels:
+    {{- include "airgap-mlops.labels" . | nindent 4 }}
+data:
+  ingress: |
+    {
+      "ingressGateway": "knative-serving/knative-ingress-gateway",
+      "ingressService": "istio-ingressgateway.istio-system.svc.cluster.local",
+      "disableIngressCreation": false
+    }
+  storageInitializer: |
+    {
+      "image": "registry.airgap.local/kserve/storage-initializer:0.13.0",
+      "memoryRequest": "100Mi",
+      "memoryLimit": "1Gi",
+      "cpuRequest": "100m"
+    }
+  deploy: |
+    {
+      "defaultDeploymentMode": "Serverless"
+    }
+{{- end }}

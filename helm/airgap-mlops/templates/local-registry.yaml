@@ -1,0 +1,75 @@
+{{- if .Values.localRegistryStack.enabled }}
+# Minimal Zot OCI registry for the air-gapped cluster.
+# For production, replace with the upstream Harbor or Zot Helm chart.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: local-registry
+  namespace: airgap-system
+  labels:
+    {{- include "airgap-mlops.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: local-registry
+  template:
+    metadata:
+      labels:
+        app: local-registry
+    spec:
+      containers:
+        - name: zot
+          image: ghcr.io/project-zot/zot-linux-amd64:v2.1.0
+          ports:
+            - containerPort: 5000
+          volumeMounts:
+            - name: storage
+              mountPath: /var/lib/registry
+            - name: config
+              mountPath: /etc/zot
+              readOnly: true
+      volumes:
+        - name: storage
+          persistentVolumeClaim:
+            claimName: local-registry-storage
+        - name: config
+          configMap:
+            name: local-registry-config
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: local-registry-storage
+  namespace: airgap-system
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: {{ .Values.localRegistryStack.storageSize | default "100Gi" }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: local-registry-config
+  namespace: airgap-system
+data:
+  config.json: |
+    {
+      "storage": {"rootDirectory": "/var/lib/registry"},
+      "http": {"address": "0.0.0.0", "port": "5000"},
+      "log": {"level": "info"}
+    }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: registry-airgap-local
+  namespace: airgap-system
+spec:
+  selector:
+    app: local-registry
+  ports:
+    - port: 5000
+      targetPort: 5000
+{{- end }}

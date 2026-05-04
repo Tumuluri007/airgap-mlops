@@ -1,0 +1,19 @@
+{{- if .Values.policies.enforce }}
+# Kyverno is installed via its own upstream chart in production. This
+# template configures it for offline operation by setting the controller
+# flags via a ConfigMap consumed by the upstream chart's overrides.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kyverno-config
+  namespace: kyverno
+  labels:
+    {{- include "airgap-mlops.labels" . | nindent 4 }}
+data:
+  # Upstream Kyverno chart reads these via --set extraArgs
+  extraArgs: |
+    --allowInsecureRegistry={{ .Values.airgap.localRegistry.insecure }}
+    --imageVerifyCacheEnabled=true
+    --imageVerifyCacheMaxSize=1000
+    --imageVerifyCacheTTL=60m
+{{- end }}

@@ -1,0 +1,38 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Air-Gapped MLOps Platform (AGM)"
+abstract: >-
+  An open reference implementation for ML model lifecycle management in
+  network-isolated Kubernetes environments. Includes the AGM four-plane
+  reference architecture, a twelve-policy Kyverno ML admission library,
+  and Container-Model Binding Attestation (CMBA).
+type: software
+authors:
+  - family-names: "Tumuluri"
+    given-names: "Yashasvi"
+    orcid: "https://orcid.org/0000-0000-0000-0000"
+repository-code: "https://github.com/Tumuluri007/airgap-mlops"
+url: "https://github.com/Tumuluri007/airgap-mlops"
+license: Apache-2.0
+version: 0.1.0
+date-released: 2026-05-03
+keywords:
+  - mlops
+  - kubernetes
+  - air-gapped
+  - kyverno
+  - sigstore
+  - cmba
+  - model-signing
+  - supply-chain-security
+  - eu-ai-act
+preferred-citation:
+  type: article
+  title: >-
+    Trustworthy Machine Learning Operations in Air-Gapped Kubernetes Clusters:
+    An Integrated Architecture for Data Governance, Supply Chain Security,
+    and Runtime Verification
+  authors:
+    - family-names: "Tumuluri"
+      given-names: "Yashasvi"
+  year: 2026

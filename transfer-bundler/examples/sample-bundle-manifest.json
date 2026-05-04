@@ -1,0 +1,31 @@
+{
+  "created": "2026-05-03T12:00:00Z",
+  "generator": "agm-bundle.sh/0.1.0",
+  "files": [
+    {
+      "name": "ml-model.tar",
+      "sha256": "1c4a9b2d3e4f56789a0b1c2d3e4f56789a0b1c2d3e4f56789a0b1c2d3e4f5678",
+      "size": 256123456
+    },
+    {
+      "name": "iris.pkl",
+      "sha256": "5d41402abc4b2a76b9719d911017c592a37b4e5be2c6f4e0a9e1c4d4d9d4c8c1",
+      "size": 12480
+    },
+    {
+      "name": "ml-bom.json",
+      "sha256": "9b74c9897bac770ffc029102a200c5de7c6f4e0a9e1c4d4d9d4c8c11c4a9b2d0",
+      "size": 8192
+    },
+    {
+      "name": "modelbinding.yaml",
+      "sha256": "ab12cd34ef56789012345678901234567890abcdef1234567890abcdef123456",
+      "size": 1024
+    },
+    {
+      "name": "modelbinding.yaml.sig",
+      "sha256": "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
+      "size": 256
+    }
+  ]
+}

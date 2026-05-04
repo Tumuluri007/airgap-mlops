@@ -1,0 +1,40 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-cmba-init-container
+  annotations:
+    policies.kyverno.io/title: "ML serving pods must include the cmba-verify init container"
+    policies.kyverno.io/category: "CMBA"
+    policies.kyverno.io/severity: "critical"
+    policies.kyverno.io/subject: "Pod"
+    policies.kyverno.io/description: >-
+      Requires every pod in the ml-serving namespace to include the
+      cmba-verify init container. The init container performs deterministic
+      local hashing and exits non-zero on a model artifact mismatch,
+      blocking pod startup when the mounted model does not match the
+      ModelBinding declaration.
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: ensure-cmba-verify-init
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces: ["ml-serving"]
+      validate:
+        message: >-
+          ml-serving pods must include init container 'cmba-verify' from
+          the approved CMBA verifier image and mount the model and binding
+          volumes.
+        pattern:
+          spec:
+            initContainers:
+              - name: cmba-verify
+                image: "registry.airgap.local/cmba/verify:*"
+                volumeMounts:
+                  - name: model-volume
+                    mountPath: "?*"
+                  - name: binding-volume
+                    mountPath: "/etc/cmba"

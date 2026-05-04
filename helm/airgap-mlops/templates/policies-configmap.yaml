@@ -1,0 +1,64 @@
+{{- if .Values.policies.enforce }}
+# Wrap the 12 ML ClusterPolicies as a single ConfigMap so they can be
+# applied atomically by the post-install hook below.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agm-policies
+  namespace: airgap-system
+  labels:
+    {{- include "airgap-mlops.labels" . | nindent 4 }}
+data:
+  README: |
+    The ML Kyverno Policy Library is materialized at install time from the
+    /policies directory shipped with this chart. Apply with:
+      kubectl apply -R -f /policies
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: agm-policy-apply
+  namespace: airgap-system
+  labels:
+    {{- include "airgap-mlops.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "10"
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: agm-policy-applier
+      containers:
+        - name: kubectl
+          image: registry.airgap.local/kubectl:1.30
+          command: ["sh", "-c"]
+          args:
+            - kubectl apply -R -f /policies/
+          volumeMounts:
+            - name: policies
+              mountPath: /policies
+      volumes:
+        - name: policies
+          configMap:
+            name: agm-policies-bundle
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: agm-policy-applier
+  namespace: airgap-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: agm-policy-applier
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - kind: ServiceAccount
+    name: agm-policy-applier
+    namespace: airgap-system
+{{- end }}

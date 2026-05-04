@@ -1,0 +1,56 @@
+# Values for AGM in fully air-gapped production deployments.
+# Override this file with site-specific paths and registry hostnames.
+
+airgap:
+  enabled: true
+  trustRootConfigMap: airgap-trust-root
+  localRegistry:
+    type: harbor
+    url: registry.airgap.local
+    insecure: false
+  localSigstore:
+    rekorUrl: https://rekor.airgap.local
+    fulcioUrl: https://fulcio.airgap.local
+    tufRootPath: /etc/airgap/tuf
+
+cmba:
+  webhook:
+    image: registry.airgap.local/cmba/webhook:0.1.0
+    replicas: 2
+    failurePolicy: Fail
+    timeoutSeconds: 30
+  sentinel:
+    image: registry.airgap.local/cmba/sentinel:0.1.0
+    recheckIntervalSeconds: 300
+    onMismatch: terminate
+  initContainer:
+    image: registry.airgap.local/cmba/verify:0.1.0
+
+policies:
+  enforce: true
+  excludedNamespaces:
+    - kube-system
+    - kyverno
+    - cert-manager
+
+evidenceLedger:
+  retention: "7y"          # Defense/regulated typical retention
+  wormBackend: true
+  storageSize: 500Gi
+
+mlflow:
+  enabled: true
+  storageSize: 100Gi
+
+kserve:
+  enabled: true
+
+localRegistryStack:
+  enabled: true
+  type: harbor
+  storageSize: 1Ti
+
+localSigstoreStack:
+  enabled: true
+  rekor:
+    storageSize: 50Gi

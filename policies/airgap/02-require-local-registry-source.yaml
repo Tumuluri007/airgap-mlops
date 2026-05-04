@@ -1,0 +1,40 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-local-registry-source
+  annotations:
+    policies.kyverno.io/title: "Container images must come from the local air-gapped registry"
+    policies.kyverno.io/category: "Air-Gap"
+    policies.kyverno.io/severity: "high"
+    policies.kyverno.io/subject: "Pod"
+    policies.kyverno.io/description: >-
+      Rejects images that originate from public registries
+      (docker.io, gcr.io, ghcr.io, quay.io, public.ecr.aws). ML serving
+      images frequently inherit from public bases like pytorch/pytorch:latest
+      and silently re-introduce public registry dependencies during rebuilds.
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: validate-image-source-allowlist
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaceSelector:
+                matchExpressions:
+                  - key: airgap.mlops/enforced
+                    operator: In
+                    values: ["true"]
+      validate:
+        message: >-
+          All container images in air-gapped ML namespaces must come from
+          registry.airgap.local or an approved internal mirror. Public
+          registries (docker.io, gcr.io, ghcr.io, quay.io, public.ecr.aws)
+          are not reachable from this cluster.
+        pattern:
+          spec:
+            =(initContainers):
+              - image: "registry.airgap.local/* | mirror.airgap.local/*"
+            containers:
+              - image: "registry.airgap.local/* | mirror.airgap.local/*"

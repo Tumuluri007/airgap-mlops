@@ -1,0 +1,10 @@
+{{- range list "ml-serving" "ml-training" "airgap-system" "cmba-system" }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ . }}
+  labels:
+    {{- include "airgap-mlops.labels" $ | nindent 4 }}
+    {{- include "airgap-mlops.airgapNamespaceLabel" $ | nindent 4 }}
+---
+{{- end }}

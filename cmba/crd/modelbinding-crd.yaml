@@ -1,0 +1,103 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: modelbindings.cmba.airgap.mlops
+spec:
+  group: cmba.airgap.mlops
+  names:
+    kind: ModelBinding
+    plural: modelbindings
+    singular: modelbinding
+    shortNames: [mb]
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required: [containerImage, modelArtifact, bindingHash]
+              properties:
+                containerImage:
+                  type: string
+                  description: "Fully qualified container image reference (registry/name@sha256:digest)"
+                modelArtifact:
+                  type: object
+                  required: [path, sha256, sizeBytes]
+                  properties:
+                    path:
+                      type: string
+                      description: "Mount path inside the container (e.g., /models/sklearn-model.pkl)"
+                    sha256:
+                      type: string
+                      pattern: "^[a-f0-9]{64}$"
+                    sizeBytes:
+                      type: integer
+                      minimum: 1
+                    format:
+                      type: string
+                      enum: [pickle, joblib, savedmodel, onnx, gguf, safetensors, torchscript]
+                bindingHash:
+                  type: string
+                  pattern: "^[a-f0-9]{64}$"
+                  description: "SHA-256(containerImage.digest || modelArtifact.sha256) — proves container and model were tested together"
+                attestation:
+                  type: object
+                  properties:
+                    signedBy:
+                      type: string
+                    signedAt:
+                      type: string
+                      format: date-time
+                    signatureBundle:
+                      type: string
+                      description: "Base64-encoded Sigstore bundle for offline verification"
+                verificationPolicy:
+                  type: object
+                  properties:
+                    initContainerRequired:
+                      type: boolean
+                      default: true
+                    sentinelRequired:
+                      type: boolean
+                      default: true
+                    recheckIntervalSeconds:
+                      type: integer
+                      default: 300
+                      minimum: 60
+                    onMismatch:
+                      type: string
+                      enum: [terminate, alert, crash]
+                      default: terminate
+            status:
+              type: object
+              properties:
+                lastVerified:
+                  type: string
+                  format: date-time
+                verificationCount:
+                  type: integer
+                mismatchEvents:
+                  type: integer
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Container
+          type: string
+          jsonPath: .spec.containerImage
+        - name: ModelSHA
+          type: string
+          jsonPath: .spec.modelArtifact.sha256
+        - name: Verifications
+          type: integer
+          jsonPath: .status.verificationCount
+        - name: Mismatches
+          type: integer
+          jsonPath: .status.mismatchEvents
+        - name: LastVerified
+          type: date
+          jsonPath: .status.lastVerified

@@ -1,0 +1,140 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cmba-webhook
+  namespace: cmba-system
+  labels:
+    {{- include "airgap-mlops.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cmba-webhook
+rules:
+  - apiGroups: ["cmba.airgap.mlops"]
+    resources: ["modelbindings"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cmba-webhook
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cmba-webhook
+subjects:
+  - kind: ServiceAccount
+    name: cmba-webhook
+    namespace: cmba-system
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: cmba-webhook-tls
+  namespace: cmba-system
+spec:
+  secretName: cmba-webhook-tls
+  issuerRef:
+    name: selfsigned
+    kind: ClusterIssuer
+  commonName: cmba-webhook.cmba-system.svc
+  dnsNames:
+    - cmba-webhook.cmba-system.svc
+    - cmba-webhook.cmba-system.svc.cluster.local
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cmba-webhook
+  namespace: cmba-system
+  labels:
+    {{- include "airgap-mlops.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.cmba.webhook.replicas }}
+  selector:
+    matchLabels:
+      app: cmba-webhook
+  template:
+    metadata:
+      labels:
+        app: cmba-webhook
+    spec:
+      serviceAccountName: cmba-webhook
+      containers:
+        - name: webhook
+          image: {{ .Values.cmba.webhook.image | quote }}
+          imagePullPolicy: IfNotPresent
+          args:
+            - --listen=:8443
+            - --tls-cert=/etc/cmba/tls/tls.crt
+            - --tls-key=/etc/cmba/tls/tls.key
+            - --trust-root=/etc/cmba/trust-root
+          ports:
+            - containerPort: 8443
+              name: webhook
+          volumeMounts:
+            - name: tls
+              mountPath: /etc/cmba/tls
+              readOnly: true
+            - name: trust-root
+              mountPath: /etc/cmba/trust-root
+              readOnly: true
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+      volumes:
+        - name: tls
+          secret:
+            secretName: cmba-webhook-tls
+        - name: trust-root
+          configMap:
+            name: {{ .Values.airgap.trustRootConfigMap | quote }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cmba-webhook
+  namespace: cmba-system
+spec:
+  selector:
+    app: cmba-webhook
+  ports:
+    - port: 443
+      targetPort: 8443
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: cmba-webhook
+  annotations:
+    cert-manager.io/inject-ca-from: cmba-system/cmba-webhook-tls
+webhooks:
+  - name: cmba.airgap.mlops
+    sideEffects: None
+    admissionReviewVersions: ["v1"]
+    failurePolicy: {{ .Values.cmba.webhook.failurePolicy | quote }}
+    timeoutSeconds: {{ .Values.cmba.webhook.timeoutSeconds }}
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: In
+          values: ["ml-serving"]
+    rules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        resources: ["pods"]
+        operations: ["CREATE"]
+    clientConfig:
+      service:
+        name: cmba-webhook
+        namespace: cmba-system
+        path: /validate
+        port: 443

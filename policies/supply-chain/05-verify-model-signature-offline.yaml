@@ -1,0 +1,36 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: verify-model-signature-offline
+  annotations:
+    policies.kyverno.io/title: "Verify ML model image signatures offline"
+    policies.kyverno.io/category: "Supply Chain"
+    policies.kyverno.io/severity: "critical"
+    policies.kyverno.io/subject: "Pod"
+    policies.kyverno.io/description: >-
+      Verifies that every container image in the ml-serving namespace
+      carries a Sigstore signature that resolves against the local trust
+      root. Verification reaches the local Rekor transparency log and
+      Fulcio CA, both running inside the air-gapped cluster.
+spec:
+  validationFailureAction: Enforce
+  webhookTimeoutSeconds: 30
+  rules:
+    - name: verify-ml-images
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces: ["ml-serving"]
+      verifyImages:
+        - imageReferences:
+            - "registry.airgap.local/ml-models/*"
+            - "registry.airgap.local/inference/*"
+          attestors:
+            - entries:
+                - keyless:
+                    subject: "ml-platform@airgap.local"
+                    issuer: "https://fulcio.airgap.local"
+                    rekor:
+                      url: "https://rekor.airgap.local"
+                      ignoreSCT: false

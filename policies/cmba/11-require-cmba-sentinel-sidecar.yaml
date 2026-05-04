@@ -1,0 +1,40 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-cmba-sentinel-sidecar
+  annotations:
+    policies.kyverno.io/title: "ML serving pods must include the cmba-sentinel sidecar"
+    policies.kyverno.io/category: "CMBA"
+    policies.kyverno.io/severity: "high"
+    policies.kyverno.io/subject: "Pod"
+    policies.kyverno.io/description: >-
+      ML serving pods must include the cmba-sentinel sidecar. Without the
+      sidecar there is no continuous re-verification, which means a model
+      file replaced on a shared PVC after pod startup would never be
+      caught. This policy closes that gap.
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: ensure-cmba-sentinel-sidecar
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces: ["ml-serving"]
+      validate:
+        message: >-
+          ml-serving pods must include the cmba-sentinel sidecar container
+          from the approved sentinel image. The sidecar re-hashes the
+          model file every recheckIntervalSeconds and updates the
+          ModelBinding status.
+        pattern:
+          spec:
+            containers:
+              - name: cmba-sentinel
+                image: "registry.airgap.local/cmba/sentinel:*"
+                volumeMounts:
+                  - name: model-volume
+                    mountPath: "?*"
+                  - name: binding-volume
+                    mountPath: "/etc/cmba"

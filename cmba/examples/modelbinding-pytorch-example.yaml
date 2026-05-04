@@ -1,0 +1,23 @@
+# Example ModelBinding for a PyTorch TorchScript model served via KServe.
+apiVersion: cmba.airgap.mlops/v1alpha1
+kind: ModelBinding
+metadata:
+  name: resnet50-classifier
+  namespace: ml-serving
+spec:
+  containerImage: "registry.airgap.local/inference/torchserve@sha256:abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
+  modelArtifact:
+    path: "/models/resnet50.pt"
+    sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    sizeBytes: 102967296
+    format: "torchscript"
+  bindingHash: "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210"
+  attestation:
+    signedBy: "ml-platform@airgap.local"
+    signedAt: "2026-05-03T12:00:00Z"
+    signatureBundle: "ZHVtbXktcHl0b3JjaC1zaWduYXR1cmUtYnVuZGxl"
+  verificationPolicy:
+    initContainerRequired: true
+    sentinelRequired: true
+    recheckIntervalSeconds: 180
+    onMismatch: terminate

@@ -1,0 +1,63 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: block-internet-bound-init-containers
+  annotations:
+    policies.kyverno.io/title: "Init containers cannot install dependencies at startup"
+    policies.kyverno.io/category: "Air-Gap"
+    policies.kyverno.io/severity: "medium"
+    policies.kyverno.io/subject: "Pod"
+    policies.kyverno.io/description: >-
+      Pattern-matches init container commands for curl, wget, pip install,
+      conda install, npm install, apt-get update and rejects the pod. Data
+      scientists routinely add `pip install scikit-learn==1.5` in init
+      containers, which fails silently in an air-gapped cluster.
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: deny-internet-bound-init-commands
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaceSelector:
+                matchExpressions:
+                  - key: airgap.mlops/enforced
+                    operator: In
+                    values: ["true"]
+      validate:
+        message: >-
+          Init containers in air-gapped ML namespaces cannot reference
+          internet-bound commands (curl, wget, pip install, conda install,
+          npm install, apt-get update). Bake all dependencies into the
+          container image before transfer.
+        deny:
+          conditions:
+            any:
+              - key: "{{ request.object.spec.initContainers[].command[] | join(' ', @) }}"
+                operator: AnyIn
+                value:
+                  - "curl"
+                  - "wget"
+                  - "pip install"
+                  - "pip3 install"
+                  - "conda install"
+                  - "npm install"
+                  - "apt-get update"
+                  - "apt update"
+                  - "yum install"
+                  - "apk add"
+              - key: "{{ request.object.spec.initContainers[].args[] | join(' ', @) }}"
+                operator: AnyIn
+                value:
+                  - "curl"
+                  - "wget"
+                  - "pip install"
+                  - "pip3 install"
+                  - "conda install"
+                  - "npm install"
+                  - "apt-get update"
+                  - "apt update"
+                  - "yum install"
+                  - "apk add"

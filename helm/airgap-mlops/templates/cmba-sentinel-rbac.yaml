@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cmba-sentinel
+  namespace: ml-serving
+  labels:
+    {{- include "airgap-mlops.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cmba-sentinel
+rules:
+  - apiGroups: ["cmba.airgap.mlops"]
+    resources: ["modelbindings/status"]
+    verbs: ["get", "update", "patch"]
+  - apiGroups: ["cmba.airgap.mlops"]
+    resources: ["modelbindings"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cmba-sentinel
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cmba-sentinel
+subjects:
+  - kind: ServiceAccount
+    name: cmba-sentinel
+    namespace: ml-serving

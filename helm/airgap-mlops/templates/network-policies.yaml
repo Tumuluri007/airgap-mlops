@@ -1,0 +1,28 @@
+{{- if .Values.airgap.enabled }}
+{{- range list "ml-serving" "ml-training" "airgap-system" "cmba-system" }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-egress
+  namespace: {{ . }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    # Allow DNS within the cluster (CoreDNS).
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Allow communication within the namespace itself.
+    - to:
+        - podSelector: {}
+---
+{{- end }}
+{{- end }}

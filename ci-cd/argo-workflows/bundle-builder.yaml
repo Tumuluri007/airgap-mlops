@@ -1,0 +1,97 @@
+# Argo Workflow that runs OUTSIDE the air-gapped cluster (e.g., on a
+# connected staging cluster) to build the signed transfer bundle.
+# Equivalent to the GitHub Actions external pipeline; provided for
+# organizations that prefer Argo for both sides of the air gap.
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: bundle-builder-
+  namespace: ci-cd
+spec:
+  entrypoint: build
+  arguments:
+    parameters:
+      - name: source-repo
+        value: https://github.com/Tumuluri007/airgap-mlops.git
+      - name: source-ref
+        value: main
+
+  templates:
+    - name: build
+      steps:
+        - - name: clone
+            template: clone
+        - - name: build-container
+            template: build-container
+        - - name: generate-mlbom
+            template: generate-mlbom
+        - - name: generate-modelbinding
+            template: generate-modelbinding
+        - - name: sign-artifacts
+            template: sign-artifacts
+        - - name: bundle
+            template: bundle
+
+    - name: clone
+      container:
+        image: alpine/git:2.45
+        command: ["sh", "-c"]
+        args:
+          - git clone {{workflow.parameters.source-repo}} /workspace/src && cd /workspace/src && git checkout {{workflow.parameters.source-ref}}
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+
+    - name: build-container
+      container:
+        image: gcr.io/kaniko-project/executor:v1.20.0
+        args:
+          - --dockerfile=/workspace/src/examples/e2e-walkthrough/sample-app/Dockerfile
+          - --context=/workspace/src/examples/e2e-walkthrough/sample-app
+          - --tar-path=/workspace/ml-model.tar
+          - --no-push
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+
+    - name: generate-mlbom
+      container:
+        image: cyclonedx/cdxgen:10
+        command: ["sh", "-c"]
+        args:
+          - cdxgen -t python --spec-version 1.6 -o /workspace/ml-bom.json /workspace/src/examples/e2e-walkthrough/sample-app
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+
+    - name: generate-modelbinding
+      container:
+        image: alpine/yq:5.0
+        command: ["sh", "/workspace/src/transfer-bundler/generate-modelbinding.sh"]
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+
+    - name: sign-artifacts
+      container:
+        image: gcr.io/projectsigstore/cosign:v2.4.0
+        command: ["sh", "-c"]
+        args:
+          - cosign sign-blob --yes --output-signature /workspace/modelbinding.yaml.sig /workspace/modelbinding.yaml
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+
+    - name: bundle
+      container:
+        image: alpine:3.20
+        command: ["sh", "-c"]
+        args:
+          - tar -cf /workspace/airgap-bundle.tar -C /workspace ml-model.tar ml-bom.json modelbinding.yaml modelbinding.yaml.sig
+        volumeMounts:
+          - name: workspace
+            mountPath: /workspace
+
+  volumes:
+    - name: workspace
+      emptyDir: {}

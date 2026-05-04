@@ -1,0 +1,41 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: restrict-airgap-egress
+  annotations:
+    policies.kyverno.io/title: "ML namespaces must have zero egress"
+    policies.kyverno.io/category: "Air-Gap"
+    policies.kyverno.io/severity: "high"
+    policies.kyverno.io/subject: "Pod, NetworkPolicy"
+    policies.kyverno.io/description: >-
+      Blocks pods in air-gapped ML namespaces unless a default-deny egress
+      NetworkPolicy is in place. Prevents ML libraries from silently phoning
+      home (HuggingFace token checks, MLflow telemetry, W&B usage stats).
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: ml-namespaces-need-deny-egress-policy
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaceSelector:
+                matchExpressions:
+                  - key: airgap.mlops/enforced
+                    operator: In
+                    values: ["true"]
+      validate:
+        message: >-
+          Air-gapped ML namespaces must have a default-deny egress
+          NetworkPolicy applied. Add a NetworkPolicy with
+          policyTypes: [Egress] and an empty egress: [] selector before
+          deploying pods.
+        foreach:
+          - list: "request.namespace.networkPolicies || `[]`"
+            deny:
+              conditions:
+                all:
+                  - key: "{{ element.spec.policyTypes }}"
+                    operator: AnyNotIn
+                    value: ["Egress"]

@@ -1,0 +1,43 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-slsa-provenance-attestation
+  annotations:
+    policies.kyverno.io/title: "Container images must carry an offline-verifiable SLSA provenance attestation"
+    policies.kyverno.io/category: "Supply Chain"
+    policies.kyverno.io/severity: "high"
+    policies.kyverno.io/subject: "Pod"
+    policies.kyverno.io/description: >-
+      Container images in ml-serving must carry an in-toto SLSA provenance
+      attestation that verifies offline against the local trust root.
+      Distinguishes between model-training provenance (SLSA-ML extension)
+      and standard build provenance.
+spec:
+  validationFailureAction: Enforce
+  webhookTimeoutSeconds: 30
+  rules:
+    - name: require-slsa-provenance
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces: ["ml-serving"]
+      verifyImages:
+        - imageReferences:
+            - "registry.airgap.local/ml-models/*"
+            - "registry.airgap.local/inference/*"
+          attestations:
+            - type: "https://slsa.dev/provenance/v1"
+              attestors:
+                - entries:
+                    - keyless:
+                        subject: "ml-platform@airgap.local"
+                        issuer: "https://fulcio.airgap.local"
+                        rekor:
+                          url: "https://rekor.airgap.local"
+                          ignoreSCT: false
+              conditions:
+                - all:
+                    - key: "{{ buildDefinition.buildType }}"
+                      operator: Equals
+                      value: "https://airgap.mlops/ml-build/v1"

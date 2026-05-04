@@ -1,0 +1,48 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-mlbom-annotation
+  annotations:
+    policies.kyverno.io/title: "Require CycloneDX ML-BOM digest annotation on ML workloads"
+    policies.kyverno.io/category: "Supply Chain"
+    policies.kyverno.io/severity: "high"
+    policies.kyverno.io/subject: "InferenceService, Pod"
+    policies.kyverno.io/description: >-
+      Every InferenceService and Pod in the ml-serving namespace must
+      carry an annotation referencing a CycloneDX ML-BOM stored in the
+      in-cluster ConfigMap registry. SBOM exists for software; ML-BOM
+      (CycloneDX 1.6) extends this to ML artifacts.
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: ml-pods-need-mlbom-annotation
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces: ["ml-serving"]
+      validate:
+        message: >-
+          ml-serving pods must carry annotation
+          mlops.airgap/mlbom-digest=<sha256:...> referencing a CycloneDX
+          ML-BOM stored as a ConfigMap in the cluster.
+        pattern:
+          metadata:
+            annotations:
+              mlops.airgap/mlbom-digest: "sha256:?*"
+    - name: inferenceservices-need-mlbom-annotation
+      match:
+        any:
+          - resources:
+              kinds: [InferenceService]
+              namespaces: ["ml-serving"]
+      validate:
+        message: >-
+          InferenceServices must carry annotation
+          mlops.airgap/mlbom-digest=<sha256:...> referencing a CycloneDX
+          ML-BOM stored as a ConfigMap in the cluster.
+        pattern:
+          metadata:
+            annotations:
+              mlops.airgap/mlbom-digest: "sha256:?*"

@@ -1,0 +1,36 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-ml-resource-limits
+  annotations:
+    policies.kyverno.io/title: "ML serving pods must declare GPU and memory limits"
+    policies.kyverno.io/category: "Governance"
+    policies.kyverno.io/severity: "high"
+    policies.kyverno.io/subject: "Pod"
+    policies.kyverno.io/description: >-
+      ML serving pods must declare GPU and memory limits. No defaults, no
+      unlimited. GPU resource specification (nvidia.com/gpu) is ML-specific;
+      standard policy libraries do not enforce GPU limits because most
+      workloads do not use GPUs. Without this, one model can starve the
+      GPU and take down every other model on the node.
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: ml-pods-must-declare-resource-limits
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaces: ["ml-serving"]
+      validate:
+        message: >-
+          ml-serving pods must declare both memory and nvidia.com/gpu
+          limits in spec.containers[].resources.limits.
+        pattern:
+          spec:
+            containers:
+              - resources:
+                  limits:
+                    memory: "?*"
+                    nvidia.com/gpu: "?*"

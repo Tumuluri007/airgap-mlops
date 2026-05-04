@@ -1,0 +1,17 @@
+# CODEOWNERS for airgap-mlops.
+# All paths default to the repo maintainer.
+
+* @Tumuluri007
+
+# Kyverno policies require security review.
+/policies/  @Tumuluri007
+
+# CMBA components require Go + admission webhook expertise.
+/cmba/  @Tumuluri007
+
+# Helm chart changes require deployment review.
+/helm/  @Tumuluri007
+
+# CI/CD workflows require pipeline review.
+/.github/workflows/  @Tumuluri007
+/ci-cd/  @Tumuluri007

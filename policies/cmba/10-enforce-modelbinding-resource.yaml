@@ -1,0 +1,42 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: enforce-modelbinding-resource
+  annotations:
+    policies.kyverno.io/title: "Every InferenceService must have a paired ModelBinding CRD"
+    policies.kyverno.io/category: "CMBA"
+    policies.kyverno.io/severity: "critical"
+    policies.kyverno.io/subject: "InferenceService"
+    policies.kyverno.io/description: >-
+      Enforces the contract that every KServe InferenceService has a
+      paired ModelBinding CRD with the same name in the same namespace.
+      The webhook performs an in-cluster API lookup; no external resolution
+      is required.
+spec:
+  validationFailureAction: Enforce
+  webhookTimeoutSeconds: 30
+  rules:
+    - name: require-paired-modelbinding
+      match:
+        any:
+          - resources:
+              kinds: [InferenceService]
+              namespaces: ["ml-serving"]
+      context:
+        - name: paired_binding
+          apiCall:
+            urlPath: "/apis/cmba.airgap.mlops/v1alpha1/namespaces/{{request.namespace}}/modelbindings/{{request.object.metadata.name}}"
+            jmesPath: "metadata.name || 'absent'"
+      validate:
+        message: >-
+          InferenceService '{{request.object.metadata.name}}' has no
+          paired ModelBinding in namespace '{{request.namespace}}'.
+          Create a ModelBinding (apiVersion cmba.airgap.mlops/v1alpha1)
+          declaring the container image and model artifact SHA-256 before
+          deploying the InferenceService.
+        deny:
+          conditions:
+            all:
+              - key: "{{ paired_binding }}"
+                operator: Equals
+                value: "absent"

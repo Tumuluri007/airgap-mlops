@@ -1,0 +1,70 @@
+{{- if .Values.localSigstoreStack.enabled }}
+# Local Rekor + Fulcio + TUF root server for offline signature verification.
+# For production, replace with the upstream sigstore Helm chart configured
+# for offline operation with a pre-staged trust root.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: local-rekor
+  namespace: airgap-system
+  labels:
+    {{- include "airgap-mlops.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: local-rekor
+  template:
+    metadata:
+      labels:
+        app: local-rekor
+    spec:
+      containers:
+        - name: rekor
+          image: registry.airgap.local/sigstore/rekor:v1.3.6
+          args: ["serve"]
+          ports:
+            - containerPort: 3000
+          volumeMounts:
+            - name: storage
+              mountPath: /var/lib/rekor
+      volumes:
+        - name: storage
+          persistentVolumeClaim:
+            claimName: rekor-storage
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rekor-storage
+  namespace: airgap-system
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: {{ .Values.localSigstoreStack.rekor.storageSize | default "50Gi" }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rekor-airgap-local
+  namespace: airgap-system
+spec:
+  selector:
+    app: local-rekor
+  ports:
+    - port: 443
+      targetPort: 3000
+---
+# Pre-staged TUF root distributed to all verification pods.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: airgap-trust-root
+  namespace: cmba-system
+data:
+  root.json: |
+    {
+      "_comment": "Replace with the actual TUF root.json distributed during initial cluster provisioning."
+    }
+{{- end }}

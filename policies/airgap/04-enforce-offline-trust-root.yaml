@@ -1,0 +1,48 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: enforce-offline-trust-root
+  annotations:
+    policies.kyverno.io/title: "Verification pods must mount the offline Sigstore trust root"
+    policies.kyverno.io/category: "Air-Gap"
+    policies.kyverno.io/severity: "high"
+    policies.kyverno.io/subject: "Pod"
+    policies.kyverno.io/description: >-
+      Pods that perform signature verification must mount the
+      airgap-trust-root ConfigMap. This forces every workload that does
+      verification to use pre-staged Sigstore trust roots rather than
+      defaulting to online Rekor (which would hang on missing internet).
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: require-offline-trust-root-mount
+      match:
+        any:
+          - resources:
+              kinds: [Pod]
+              namespaceSelector:
+                matchExpressions:
+                  - key: airgap.mlops/enforced
+                    operator: In
+                    values: ["true"]
+              selector:
+                matchExpressions:
+                  - key: airgap.mlops/sig-verify
+                    operator: In
+                    values: ["true"]
+      validate:
+        message: >-
+          Pods that perform signature verification must mount the
+          airgap-trust-root ConfigMap at /etc/airgap/sigstore.
+        pattern:
+          spec:
+            volumes:
+              - name: "?*"
+                configMap:
+                  name: airgap-trust-root
+            containers:
+              - volumeMounts:
+                  - mountPath: "/etc/airgap/sigstore"
+                    name: "?*"
+                    readOnly: true

@@ -1,0 +1,53 @@
+# Default values for airgap-mlops.
+# Suitable for kind/minikube developer environments. For air-gapped
+# production, use values-airgap.yaml instead.
+
+airgap:
+  enabled: false
+  trustRootConfigMap: airgap-trust-root
+  localRegistry:
+    type: harbor
+    url: registry.local
+    insecure: true
+  localSigstore:
+    rekorUrl: https://rekor.local
+    fulcioUrl: https://fulcio.local
+    tufRootPath: /etc/airgap/tuf
+
+cmba:
+  webhook:
+    image: ghcr.io/tumuluri007/cmba-webhook:0.1.0
+    replicas: 1
+    failurePolicy: Fail
+    timeoutSeconds: 30
+  sentinel:
+    image: ghcr.io/tumuluri007/cmba-sentinel:0.1.0
+    recheckIntervalSeconds: 300
+    onMismatch: terminate
+  initContainer:
+    image: ghcr.io/tumuluri007/cmba-verify:0.1.0
+
+policies:
+  enforce: true
+  excludedNamespaces:
+    - kube-system
+    - kyverno
+    - cert-manager
+
+evidenceLedger:
+  retention: "90d"
+  wormBackend: false
+  storageSize: 20Gi
+
+mlflow:
+  enabled: true
+  storageSize: 10Gi
+
+kserve:
+  enabled: true
+
+localRegistryStack:
+  enabled: false
+
+localSigstoreStack:
+  enabled: false

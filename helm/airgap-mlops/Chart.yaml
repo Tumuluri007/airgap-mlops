@@ -1,0 +1,27 @@
+apiVersion: v2
+name: airgap-mlops
+description: Air-Gapped MLOps Platform with Kyverno Policies and CMBA
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - mlops
+  - kubernetes
+  - air-gapped
+  - kyverno
+  - sigstore
+  - cmba
+  - model-signing
+  - supply-chain-security
+home: https://github.com/Tumuluri007/airgap-mlops
+sources:
+  - https://github.com/Tumuluri007/airgap-mlops
+maintainers:
+  - name: Yashasvi Tumuluri
+    email: noreply@example.com
+icon: https://raw.githubusercontent.com/Tumuluri007/airgap-mlops/main/docs/logo.png
+annotations:
+  artifacthub.io/license: Apache-2.0
+  artifacthub.io/changes: |
+    - kind: added
+      description: Initial release of AGM with 12 Kyverno policies and CMBA

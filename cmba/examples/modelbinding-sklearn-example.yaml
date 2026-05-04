@@ -1,0 +1,26 @@
+# Example ModelBinding for a scikit-learn model served via KServe.
+#
+# The bindingHash is SHA-256 of (containerImage.digest || modelArtifact.sha256)
+# and proves the container and model were tested together at build time.
+apiVersion: cmba.airgap.mlops/v1alpha1
+kind: ModelBinding
+metadata:
+  name: iris-classifier
+  namespace: ml-serving
+spec:
+  containerImage: "registry.airgap.local/inference/sklearn-server@sha256:1c4a9b2d3e4f56789a0b1c2d3e4f56789a0b1c2d3e4f56789a0b1c2d3e4f5678"
+  modelArtifact:
+    path: "/models/iris.pkl"
+    sha256: "5d41402abc4b2a76b9719d911017c592a37b4e5be2c6f4e0a9e1c4d4d9d4c8c1"
+    sizeBytes: 12480
+    format: "pickle"
+  bindingHash: "9b74c9897bac770ffc029102a200c5de7c6f4e0a9e1c4d4d9d4c8c11c4a9b2d"
+  attestation:
+    signedBy: "ml-platform@airgap.local"
+    signedAt: "2026-05-03T12:00:00Z"
+    signatureBundle: "ZHVtbXktc2lnbmF0dXJlLWJ1bmRsZS1mb3ItZXhhbXBsZQ=="
+  verificationPolicy:
+    initContainerRequired: true
+    sentinelRequired: true
+    recheckIntervalSeconds: 300
+    onMismatch: terminate
