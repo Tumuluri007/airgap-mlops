@@ -1,0 +1,72 @@
+name: CMBA Component Tests
+
+on:
+  pull_request:
+    paths:
+      - 'cmba/**'
+  push:
+    branches: [main]
+    paths:
+      - 'cmba/**'
+
+jobs:
+  webhook:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Build webhook
+        working-directory: cmba/webhook
+        run: go build ./...
+
+      - name: Test webhook
+        working-directory: cmba/webhook
+        run: go test ./...
+
+  sentinel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Build sentinel
+        working-directory: cmba/sentinel
+        run: go build ./...
+
+      - name: Test sentinel
+        working-directory: cmba/sentinel
+        run: go test -v ./...
+
+  init-container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Shellcheck verify.sh
+        uses: ludeeus/action-shellcheck@master
+        with:
+          scandir: cmba/init-container
+
+      - name: Smoke test verify.sh
+        run: |
+          mkdir -p /tmp/cmba-test/etc/cmba /tmp/cmba-test/models
+          echo "hello model" > /tmp/cmba-test/models/model.pkl
+          SHA=$(sha256sum /tmp/cmba-test/models/model.pkl | awk '{print $1}')
+          cat > /tmp/cmba-test/etc/cmba/binding.yaml <<EOF
+          spec:
+            modelArtifact:
+              path: /tmp/cmba-test/models/model.pkl
+              sha256: ${SHA}
+          EOF
+          sudo apt-get install -y yq
+          CMBA_BINDING_FILE=/tmp/cmba-test/etc/cmba/binding.yaml \
+            bash cmba/init-container/verify.sh
