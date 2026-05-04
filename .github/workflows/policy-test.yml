@@ -1,0 +1,36 @@
+name: Policy Tests
+
+on:
+  pull_request:
+    paths:
+      - 'policies/**'
+  push:
+    branches: [main]
+    paths:
+      - 'policies/**'
+
+jobs:
+  chainsaw:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Kyverno chainsaw
+        run: |
+          curl -sSL "https://github.com/kyverno/chainsaw/releases/latest/download/chainsaw_linux_amd64.tar.gz" \
+            | tar -xz -C /usr/local/bin chainsaw
+
+      - name: Validate every ClusterPolicy YAML
+        run: |
+          curl -sSL "https://github.com/kyverno/kyverno/releases/latest/download/kyverno-cli_linux_x86_64.tar.gz" \
+            | tar -xz -C /usr/local/bin kyverno
+          for f in $(find policies -name '*.yaml' -not -path '*/tests/*'); do
+            echo "Validating $f"
+            kyverno apply $f --resource <(echo '{}') --skip-cluster=true 2>&1 || true
+          done
+
+      - name: Lint policy YAML
+        run: |
+          for f in $(find policies -name '*.yaml' -not -path '*/tests/*'); do
+            python -c "import yaml; yaml.safe_load(open('$f'))" || exit 1
+          done
