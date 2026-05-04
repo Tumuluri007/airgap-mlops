@@ -1,0 +1,33 @@
+name: Helm Chart Lint and Template Test
+
+on:
+  pull_request:
+    paths:
+      - 'helm/**'
+  push:
+    branches: [main]
+    paths:
+      - 'helm/**'
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: 'v3.14.0'
+
+      - name: Lint Helm chart
+        run: helm lint helm/airgap-mlops
+
+      - name: Template Helm chart with default values
+        run: helm template airgap-mlops helm/airgap-mlops -f helm/airgap-mlops/values.yaml > /tmp/manifests-default.yaml
+
+      - name: Template Helm chart with air-gap values
+        run: helm template airgap-mlops helm/airgap-mlops -f helm/airgap-mlops/values-airgap.yaml > /tmp/manifests-airgap.yaml
+
+      - name: Verify ML namespaces have airgap.mlops/enforced label
+        run: grep -q "airgap.mlops/enforced" /tmp/manifests-airgap.yaml
