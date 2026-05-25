@@ -9,7 +9,7 @@ metadata:
   generateName: airgap-deploy-
   namespace: airgap-system
 spec:
-  entrypoint: deploy
+  entrypoint: deploy 
   arguments:
     parameters:
       - name: bundle-path
